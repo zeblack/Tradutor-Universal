@@ -1,0 +1,5 @@
+wfastapi
+uvicorn[standard]
+websockets
+deep-translator
+edge-tts

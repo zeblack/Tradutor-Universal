@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - VoiceBridge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            overflow-y: auto;
+        }
+
+        .profile-container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 30px;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .avatar-section {
+            position: relative;
+        }
+
+        .avatar-display {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: 700;
+            overflow: hidden;
+            border: 4px solid var(--bg-surface);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        .avatar-display img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .upload-btn {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            font-size: 14px;
+        }
+
+        .upload-btn:hover {
+            background: var(--bg-dark);
+        }
+
+        .profile-info h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .profile-info p {
+            color: var(--text-muted);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .history-item {
+            background: var(--bg-dark);
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .history-details h4 {
+            margin-bottom: 4px;
+            font-size: 15px;
+        }
+
+        .history-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="profile-container">
+        <div class="nav-header">
+            <button class="control-btn" onclick="window.location.href='discord.html'">← Back to Lobby</button>
+            <button class="control-btn danger" onclick="logout()">Sign Out</button>
+        </div>
+
+        <div class="profile-header">
+            <div class="avatar-section">
+                <div class="avatar-display" id="avatarPreview">U</div>
+                <label class="upload-btn" title="Change Avatar">
+                    📷
+                    <input type="file" id="avatarInput" accept="image/*" style="display:none"
+                        onchange="uploadAvatar(this)">
+                </label>
+            </div>
+            <div class="profile-info">
+                <h1 id="profileName">Loading...</h1>
+                <p id="profileEmail">...</p>
+                <div style="margin-top: 10px; font-size: 12px; color: var(--success);">
+                    Premium Member
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">Room History</div>
+            <div id="historyList" class="history-list">
+                <div style="color:var(--text-muted); text-align:center; padding:20px;">
+                    Loading history...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('vb_token');
+        if (!token) window.location.href = 'login.html';
+
+        // Load Profile
+        window.onload = async function () {
+            await loadProfile();
+            await loadHistory();
+        };
+
+        async function loadProfile() {
+            try {
+                const res = await fetch('/api/auth/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error("Auth failed");
+                const data = await res.json();
+                const user = data.user;
+
+                document.getElementById('profileName').textContent = user.username;
+                document.getElementById('profileEmail').textContent = user.email;
+
+                updateAvatarDisplay(user.avatar_url, user.username);
+
+                // Update localStorage user data just in case
+                localStorage.setItem('vb_user', JSON.stringify(user));
+
+            } catch (e) {
+                console.error(e);
+                window.location.href = 'login.html';
+            }
+        }
+
+        function updateAvatarDisplay(url, name) {
+            const el = document.getElementById('avatarPreview');
+            if (url) {
+                el.innerHTML = `<img src="${url}" alt="Avatar">`;
+                // Remove background color if image exists
+                el.style.backgroundColor = 'transparent';
+                el.style.border = 'none';
+            } else {
+                el.textContent = name.charAt(0).toUpperCase();
+                el.style.backgroundColor = 'var(--primary)';
+            }
+        }
+
+        async function uploadAvatar(input) {
+            if (!input.files || !input.files[0]) return;
+
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const btn = document.querySelector('.upload-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳';
+
+            try {
+                const res = await fetch('/api/profile/avatar', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (!res.ok) throw new Error("Upload failed");
+
+                const data = await res.json();
+                // Reload profile to update UI
+                loadProfile();
+
+            } catch (e) {
+                alert("Failed to upload avatar: " + e.message);
+            } finally {
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/auth/history', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const container = document.getElementById('historyList');
+
+                if (!data.history || data.history.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:20px;">No history found.</div>';
+                    return;
+                }
+
+                container.innerHTML = data.history.map(item => `
+                    <div class="history-item">
+                        <div class="history-details">
+                            <h4>${item.room_name}</h4>
+                            <div class="history-meta">Role: ${item.role || 'Speaker'}</div>
+                        </div>
+                        <div class="history-meta">
+                            ${new Date(item.joined_at).toLocaleString()}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error("History error:", e);
+                document.getElementById('historyList').innerHTML = '<div style="color:var(--danger)">Failed to load history</div>';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('vb_token');
+            localStorage.removeItem('vb_user');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+
+</html>

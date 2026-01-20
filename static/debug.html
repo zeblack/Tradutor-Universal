@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Debug Test</title>
+</head>
+
+<body>
+    <h1>Debug Test Page</h1>
+    <button onclick="testConnection()">Test WebSocket</button>
+    <button onclick="testSpeech()">Test Speech Recognition</button>
+    <div id="log" style="margin-top:20px; font-family:monospace; white-space:pre-wrap;"></div>
+
+    <script>
+        const log = document.getElementById('log');
+
+        function addLog(msg) {
+            log.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+            console.log(msg);
+        }
+
+        function testConnection() {
+            addLog('Testing WebSocket connection...');
+            const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+            ws.onopen = () => {
+                addLog('✅ WebSocket connected!');
+                addLog('Sending handshake...');
+                ws.send(JSON.stringify({
+                    type: 'init',
+                    language: 'pt-BR',
+                    name: 'TestUser'
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                addLog(`📨 Received: ${event.data}`);
+            };
+
+            ws.onerror = (error) => {
+                addLog(`❌ Error: ${error}`);
+            };
+
+            ws.onclose = () => {
+                addLog('🔌 Connection closed');
+            };
+
+            // Test sending speech after 2 seconds
+            setTimeout(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    addLog('Sending test speech message...');
+                    ws.send(JSON.stringify({
+                        type: 'speech',
+                        text: 'Olá, este é um teste',
+                        source_lang: 'pt-BR'
+                    }));
+                }
+            }, 2000);
+        }
+
+        function testSpeech() {
+            addLog('Testing Speech Recognition...');
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                addLog('❌ Speech Recognition not supported!');
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'pt-BR';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                addLog('🎤 Listening... (speak now)');
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                addLog(`✅ Recognized: "${transcript}"`);
+            };
+
+            recognition.onerror = (event) => {
+                addLog(`❌ Speech error: ${event.error}`);
+            };
+
+            recognition.onend = () => {
+                addLog('🎤 Stopped listening');
+            };
+
+            recognition.start();
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceBridge - Premium Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+    <style>
+        /* Local overrides for Login Layout */
+        body {
+            background-image:
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 40%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 440px;
+            padding: 20px;
+            perspective: 1000px;
+        }
+
+        .auth-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .brand-logo {
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            margin-bottom: 8px;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .auth-subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 4px;
+            border-radius: 12px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .auth-tab.active {
+            background: var(--bg-surface);
+            color: var(--text-main);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .guest-link {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .guest-link a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.2s;
+        }
+
+        .guest-link a:hover {
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="brand-logo">VoiceBridge</div>
+                <div class="auth-subtitle">Seamless global communication</div>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
+                <button class="auth-tab" onclick="switchAuthTab('register')">Create Account</button>
+            </div>
+
+            <div id="error-message" class="error-message"
+                style="display:none; color:var(--danger); background:rgba(244,63,94,0.1); padding:10px; border-radius:8px; margin-bottom:20px; text-align:center; font-size:13px;">
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form active" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <div class="input-wrapper">
+                        <input type="email" id="login-email" required placeholder="john@company.com">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="login-password" required placeholder="••••••••">
+                    </div>
+                </div>
+                <button type="submit" class="action-btn" id="login-btn">Sign In</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="auth-form" style="display:none;" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="register-username" required placeholder="John Doe">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <div class="input-wrapper">
+                        <input type="email" id="register-email" required placeholder="john@company.com">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="register-password" required minlength="6"
+                            placeholder="Min. 6 characters">
+                    </div>
+                </div>
+                <button type="submit" class="action-btn" style="background: linear-gradient(135deg, #8b5cf6, #d946ef);"
+                    id="register-btn">Get Started</button>
+            </form>
+
+            <div class="guest-link">
+                <a href="discord.html">Or continue as Guest (Limited Access) →</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchAuthTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+            document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
+
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-message');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true; btn.style.opacity = 0.7; btn.textContent = 'Verifying...';
+
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Login failed');
+
+                localStorage.setItem('vb_token', data.token);
+                localStorage.setItem('vb_user', JSON.stringify(data.user));
+                window.location.href = 'discord.html';
+            } catch (error) {
+                showError(error.message);
+                btn.disabled = false; btn.style.opacity = 1; btn.textContent = 'Sign In';
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = document.getElementById('register-btn');
+            btn.disabled = true; btn.style.opacity = 0.7; btn.textContent = 'Creating...';
+
+            const username = document.getElementById('register-username').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed');
+
+                localStorage.setItem('vb_token', data.token);
+                localStorage.setItem('vb_user', JSON.stringify(data.user));
+                window.location.href = 'discord.html';
+            } catch (error) {
+                showError(error.message);
+                btn.disabled = false; btn.style.opacity = 1; btn.textContent = 'Get Started';
+            }
+        }
+
+        window.onload = function () {
+            if (localStorage.getItem('vb_token')) {
+                fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('vb_token') } })
+                    .then(r => { if (r.ok) window.location.href = 'discord.html'; });
+            }
+        };
+    </script>
+</body>
+
+</html>

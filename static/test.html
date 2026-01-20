@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Text Translation Test</title>
+    <style>
+        body {
+            font-family: Arial;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+        }
+
+        .input-group {
+            margin: 20px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        #messages {
+            margin-top: 30px;
+            border: 1px solid #ddd;
+            padding: 20px;
+            min-height: 300px;
+            background: #f9f9f9;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .original {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 5px;
+        }
+
+        .translated {
+            color: #000;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .audio-player {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🌍 Teste de Tradução (Texto)</h1>
+
+    <div class="input-group">
+        <label>Seu Nome:</label>
+        <input type="text" id="userName" value="TestUser">
+    </div>
+
+    <div class="input-group">
+        <label>Seu Idioma:</label>
+        <select id="userLang">
+            <option value="pt-BR">🇧🇷 Português</option>
+            <option value="en-US">🇺🇸 English</option>
+            <option value="es-ES">🇪🇸 Español</option>
+            <option value="fr-FR">🇫🇷 Français</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>Digite sua mensagem:</label>
+        <input type="text" id="messageInput" placeholder="Digite algo..." disabled>
+    </div>
+
+    <button id="joinBtn" onclick="joinRoom()">Entrar na Sala</button>
+    <button id="sendBtn" onclick="sendMessage()" style="display:none;">Enviar Mensagem</button>
+
+    <div id="messages">
+        <p style="color: #999; text-align: center;">Escolha seu idioma e clique em "Entrar na Sala"</p>
+    </div>
+
+    <script>
+        let socket;
+        let myName, myLang;
+        let isConnected = false;
+
+        function joinRoom() {
+            myName = document.getElementById('userName').value;
+            myLang = document.getElementById('userLang').value;
+
+            console.log(`Joining as ${myName} with language ${myLang}`);
+
+            document.getElementById('joinBtn').disabled = true;
+            document.getElementById('joinBtn').textContent = 'Conectando...';
+
+            socket = new WebSocket(`ws://${window.location.host}/ws`);
+
+            socket.onopen = () => {
+                console.log('Connected!');
+                document.getElementById('messages').innerHTML = `<p style="color: green;">✅ Conectado como <strong>${myName}</strong> (${myLang})! Digite uma mensagem.</p>`;
+
+                socket.send(JSON.stringify({
+                    type: 'init',
+                    language: myLang,
+                    name: myName
+                }));
+
+                isConnected = true;
+                document.getElementById('joinBtn').style.display = 'none';
+                document.getElementById('sendBtn').style.display = 'inline-block';
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('messageInput').focus();
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Received:', data);
+
+                if (data.type === 'message') {
+                    addMessage(data);
+                }
+            };
+
+            socket.onclose = () => {
+                document.getElementById('messages').innerHTML += '<p style="color: red;">❌ Desconectado</p>';
+                isConnected = false;
+            };
+        }
+
+        function sendMessage() {
+            const text = document.getElementById('messageInput').value;
+            if (!text.trim()) return;
+
+            if (socket.readyState === WebSocket.OPEN) {
+                console.log(`Sending: "${text}" in ${myLang}`);
+                socket.send(JSON.stringify({
+                    type: 'speech',
+                    text: text,
+                    source_lang: myLang
+                }));
+                document.getElementById('messageInput').value = '';
+            }
+        }
+
+        function addMessage(data) {
+            const div = document.createElement('div');
+            div.className = 'message';
+
+            let audioHtml = '';
+            if (data.audio_url) {
+                audioHtml = `<audio class="audio-player" controls src="${data.audio_url}"></audio>`;
+            }
+
+            div.innerHTML = `
+                <strong>${data.sender_name} (${data.sender_lang})</strong>
+                <div class="original">"${data.original_text}"</div>
+                <div class="translated">➤ ${data.translated_text}</div>
+                ${audioHtml}
+            `;
+
+            document.getElementById('messages').appendChild(div);
+
+            // Auto-play audio if not from self
+            if (data.audio_url && !data.is_self) {
+                const audio = new Audio(data.audio_url);
+                audio.play().then(() => {
+                    console.log('✅ Audio played!');
+                }).catch(e => {
+                    console.error('❌ Audio failed:', e);
+                });
+            }
+        }
+
+        // Enter to send
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && isConnected) sendMessage();
+        });
+    </script>
+</body>
+
+</html>

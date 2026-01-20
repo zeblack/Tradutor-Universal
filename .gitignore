@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Media Output (Don't version user generated content)
+audio_output/
+static/avatars/
+!static/avatars/.keep
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log

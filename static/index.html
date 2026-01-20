@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multilingual Meeting Room</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Join Screen */
+        #joinScreen {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 450px;
+            width: 90%;
+        }
+
+        #joinScreen h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #joinScreen p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .join-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .join-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        /* Meeting Room */
+        #meetingRoom {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            background: #f5f7fa;
+        }
+
+        .room-container {
+            display: flex;
+            height: 100%;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .sidebar-header h2 {
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-header .status {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .participants-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .participants-title {
+            font-size: 0.8em;
+            text-transform: uppercase;
+            color: #999;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .participant {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            transition: background 0.2s;
+        }
+
+        .participant:hover {
+            background: #e9ecef;
+        }
+
+        .participant-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 12px;
+            font-size: 0.9em;
+        }
+
+        .participant-info {
+            flex: 1;
+        }
+
+        .participant-name {
+            font-weight: 600;
+            font-size: 0.95em;
+            color: #333;
+        }
+
+        .participant-lang {
+            font-size: 0.75em;
+            color: #999;
+        }
+
+        /* Main Chat Area */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 20px 30px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h1 {
+            font-size: 1.5em;
+            color: #333;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .control-btn.mic {
+            background: #10b981;
+            color: white;
+        }
+
+        .control-btn.mic.muted {
+            background: #ef4444;
+        }
+
+        .control-btn.audio {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            background: #f5f7fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease;
+        }
+
+        .message.system {
+            text-align: center;
+            color: #999;
+            font-size: 0.85em;
+            font-style: italic;
+        }
+
+        .message.user-message {
+            display: flex;
+            gap: 12px;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .message-content {
+            flex: 1;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .message-time {
+            font-size: 0.75em;
+            color: #999;
+        }
+
+        .message-original {
+            font-size: 0.85em;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .message-translated {
+            font-size: 1em;
+            color: #111;
+            line-height: 1.5;
+        }
+
+        .message.self .message-content {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        }
+
+        .lang-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .lang-badge.pt {
+            background: #10b98120;
+            color: #10b981;
+        }
+
+        .lang-badge.en {
+            background: #3b82f620;
+            color: #3b82f6;
+        }
+
+        .lang-badge.es {
+            background: #f59e0b20;
+            color: #f59e0b;
+        }
+
+        .lang-badge.fr {
+            background: #8b5cf620;
+            color: #8b5cf6;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Voice Indicator */
+        .voice-indicator {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .voice-indicator.active {
+            display: flex;
+        }
+
+        .pulse {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Join Screen -->
+    <div id="joinScreen">
+        <h1>🌍 Multilingual Meeting</h1>
+        <p>Join a meeting room where everyone speaks their own language</p>
+
+        <div class="input-group">
+            <label>Your Name</label>
+            <input type="text" id="userName" placeholder="Enter your name" value="User">
+        </div>
+
+        <div class="input-group">
+            <label>Your Language</label>
+            <select id="userLang">
+                <option value="pt-BR">🇧🇷 Português (Brasil)</option>
+                <option value="en-US">🇺🇸 English (US)</option>
+                <option value="es-ES">🇪🇸 Español (España)</option>
+                <option value="fr-FR">🇫🇷 Français (France)</option>
+                <option value="de-DE">🇩🇪 Deutsch (Deutschland)</option>
+                <option value="it-IT">🇮🇹 Italiano (Italia)</option>
+                <option value="ja-JP">🇯🇵 日本語 (Japanese)</option>
+                <option value="zh-CN">🇨🇳 中文 (Chinese)</option>
+            </select>
+        </div>
+
+        <button class="join-btn" onclick="joinMeeting()">Join Meeting Room</button>
+    </div>
+
+    <!-- Meeting Room -->
+    <div id="meetingRoom">
+        <div class="room-container">
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>Meeting Room</h2>
+                    <div class="status" id="connectionStatus">Connecting...</div>
+                </div>
+                <div class="participants-section">
+                    <div class="participants-title">PARTICIPANTS</div>
+                    <div id="participantsList"></div>
+                </div>
+            </div>
+
+            <!-- Main Area -->
+            <div class="main-area">
+                <div class="chat-header">
+                    <h1 id="roomTitle">Live Translation</h1>
+                    <div class="controls">
+                        <button class="control-btn mic" id="micBtn" onclick="toggleMic()">
+                            🎤 Listening
+                        </button>
+                        <button class="control-btn audio" id="audioBtn" onclick="toggleAudio()">
+                            🔊 Audio On
+                        </button>
+                    </div>
+                </div>
+                <div class="messages-container" id="messages"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Indicator -->
+    <div class="voice-indicator" id="voiceIndicator">
+        <div class="pulse"></div>
+        <span>Listening...</span>
+    </div>
+
+    <script>
+        let socket;
+        let recognition;
+        let myLang, myName, myId;
+        let isMuted = false;
+        let isAudioEnabled = true;
+        let audioContext = null;
+
+        const langNames = {
+            'pt-BR': 'PT', 'en-US': 'EN', 'es-ES': 'ES', 'fr-FR': 'FR',
+            'de-DE': 'DE', 'it-IT': 'IT', 'ja-JP': 'JA', 'zh-CN': 'ZH'
+        };
+
+        function joinMeeting() {
+            myName = document.getElementById('userName').value || 'User';
+            myLang = document.getElementById('userLang').value;
+
+            // Initialize audio context on user interaction
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioContext.resume();
+                console.log('Audio context initialized');
+            }
+
+            document.getElementById('joinScreen').style.display = 'none';
+            document.getElementById('meetingRoom').style.display = 'block';
+
+            connectWebSocket();
+            initSpeechRecognition();
+        }
+
+        function connectWebSocket() {
+            socket = new WebSocket(`ws://${window.location.host}/ws`);
+
+            socket.onopen = () => {
+                // Send handshake
+                socket.send(JSON.stringify({
+                    type: 'init',
+                    language: myLang,
+                    name: myName
+                }));
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                console.log('WebSocket connected');
+            };
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('Received message:', data);
+
+                if (data.type === 'system') {
+                    addSystemMessage(data.message);
+                } else if (data.type === 'message') {
+                    addMessage(data);
+                    if (isAudioEnabled && data.audio_url && !data.is_self) {
+                        console.log('Playing audio:', data.audio_url);
+                        playAudio(data.audio_url);
+                    } else {
+                        console.log('Audio skipped:', { isAudioEnabled, hasUrl: !!data.audio_url, isSelf: data.is_self });
+                    }
+                } else if (data.type === 'participants') {
+                    updateParticipantsList(data.participants);
+                }
+            };
+
+            socket.onclose = () => {
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                addSystemMessage('Connection lost. Refresh to rejoin.');
+            };
+        }
+
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert('Speech recognition not supported. Use Chrome/Edge.');
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = myLang;
+
+            recognition.onstart = () => {
+                document.getElementById('voiceIndicator').classList.add('active');
+                console.log('Speech recognition started');
+            };
+
+            recognition.onend = () => {
+                document.getElementById('voiceIndicator').classList.remove('active');
+                if (!isMuted) {
+                    // Add delay before restart to prevent rapid restart loops
+                    setTimeout(() => {
+                        try { recognition.start(); } catch (e) { console.log('Restart ignored:', e); }
+                    }, 100);
+                }
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[event.results.length - 1][0].transcript;
+                console.log('Recognized:', transcript);
+                if (transcript.trim() && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: 'speech',
+                        text: transcript,
+                        source_lang: myLang
+                    }));
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                // Don't restart on abort or network errors
+                if (event.error === 'aborted' || event.error === 'network') {
+                    console.log(`Recognition ${event.error} - stopping auto-restart`);
+                    isMuted = true;
+                    document.getElementById('micBtn').classList.add('muted');
+                    document.getElementById('micBtn').innerHTML = `🔇 Error: ${event.error} (Click to retry)`;
+                }
+            };
+
+            recognition.start();
+        }
+
+        function addMessage(data) {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message user-message ${data.is_self ? 'self' : ''}`;
+
+            const langCode = langNames[data.sender_lang] || data.sender_lang.split('-')[0].toUpperCase();
+
+            div.innerHTML = `
+                <div class="message-avatar">${data.sender_name.charAt(0).toUpperCase()}</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-sender">
+                            ${data.sender_name}
+                            <span class="lang-badge ${langCode.toLowerCase()}">${langCode}</span>
+                        </span>
+                        <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                    </div>
+                    ${!data.is_self ? `<div class="message-original">"${data.original_text}"</div>` : ''}
+                    <div class="message-translated">${data.translated_text}</div>
+                </div>
+            `;
+
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = 'message system';
+            div.textContent = text;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateParticipantsList(participants) {
+            const list = document.getElementById('participantsList');
+            list.innerHTML = participants.map(p => {
+                const langCode = langNames[p.language] || p.language.split('-')[0].toUpperCase();
+                return `
+                    <div class="participant">
+                        <div class="participant-avatar">${p.name.charAt(0).toUpperCase()}</div>
+                        <div class="participant-info">
+                            <div class="participant-name">${p.name}</div>
+                            <div class="participant-lang">${langCode}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function playAudio(url) {
+            console.log('Attempting to play:', url);
+            const audio = new Audio(url);
+            audio.volume = 1.0;
+
+            const playPromise = audio.play();
+
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log('✅ Audio playing successfully');
+                    })
+                    .catch(error => {
+                        console.error('❌ Audio play failed:', error);
+                        // Try to unlock audio context
+                        if (audioContext && audioContext.state === 'suspended') {
+                            audioContext.resume().then(() => {
+                                console.log('Audio context resumed, retrying...');
+                                audio.play().catch(e => console.error('Retry failed:', e));
+                            });
+                        }
+                    });
+            }
+        }
+
+        function toggleMic() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('micBtn');
+
+            if (isMuted) {
+                recognition.stop();
+                btn.classList.add('muted');
+                btn.innerHTML = '🔇 Muted';
+            } else {
+                recognition.start();
+                btn.classList.remove('muted');
+                btn.innerHTML = '🎤 Listening';
+            }
+        }
+
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            const btn = document.getElementById('audioBtn');
+            btn.innerHTML = isAudioEnabled ? '🔊 Audio On' : '🔇 Audio Off';
+            console.log('Audio enabled:', isAudioEnabled);
+        }
+    </script>
+
+</body>
+
+</html>

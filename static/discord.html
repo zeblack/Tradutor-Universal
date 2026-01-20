@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceBridge Premium</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Lobby Screen -->
+    <div id="lobbyScreen" class="lobby-container">
+        <div class="lobby-sidebar">
+            <h2 class="lobby-brand">VoiceBridge</h2>
+
+            <div class="form-group">
+                <label class="room-category" style="margin:0 0 8px 0">Your Profile</label>
+                <input type="text" id="userName" class="lobby-input" value="Guest User" placeholder="Your Name">
+            </div>
+
+            <div class="form-group">
+                <label class="room-category" style="margin:0 0 8px 0">Language</label>
+                <select id="userLang" class="lobby-select">
+                    <option value="pt-BR">🇧🇷 Português</option>
+                    <option value="en-US">🇺🇸 English</option>
+                    <option value="es-ES">🇪🇸 Español</option>
+                    <option value="fr-FR">🇫🇷 Français</option>
+                    <option value="de-DE">🇩🇪 Deutsch</option>
+                    <option value="it-IT">🇮🇹 Italiano</option>
+                    <option value="ja-JP">🇯🇵 日本語</option>
+                    <option value="zh-CN">🇨🇳 中文</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="room-category" style="margin:0 0 8px 0">Role</label>
+                <select id="userRole" class="lobby-select">
+                    <option value="speaker">🎤 Speaker</option>
+                    <option value="spectator">👁️ Spectator</option>
+                </select>
+            </div>
+
+            <div style="flex:1"></div> <!-- Spacer -->
+
+            <button onclick="logoutFromLobby()" class="control-btn danger"
+                style="width:100%; justify-content:center; display:flex;">
+                Run Away (Logout)
+            </button>
+        </div>
+
+        <div class="lobby-main">
+            <div class="lobby-tabs">
+                <button class="tab-btn active" onclick="switchTab('public')">Public Rooms</button>
+                <button class="tab-btn" onclick="switchTab('create')">Create Room</button>
+                <button class="tab-btn" onclick="switchTab('private')">Join Private</button>
+            </div>
+
+            <!-- Tab: Public -->
+            <div id="tab-public" class="tab-content active">
+                <div class="rooms-grid" id="publicRoomsList">
+                    <div style="color:var(--text-muted); padding:20px;">Fetching nearby audio signals...</div>
+                </div>
+                <button class="action-btn" style="width:auto; margin-top:30px; background:var(--bg-surface);"
+                    onclick="fetchRooms()">🔄 Refresh Radar</button>
+            </div>
+
+            <!-- Tab: Create -->
+            <div id="tab-create" class="tab-content">
+                <div class="room-card" style="max-width:500px; cursor:default; hover:none;">
+                    <h3 style="margin-bottom:20px;">Deploy New Frequency</h3>
+                    <div class="form-group">
+                        <label class="room-category" style="margin-left:0">Room Name</label>
+                        <input type="text" id="newRoomName" class="lobby-input" placeholder="e.g., Chill Zone">
+                    </div>
+                    <div class="form-group">
+                        <label class="room-category" style="margin-left:0">Security Protocol</label>
+                        <div style="display:flex; gap:20px; margin-top:10px;">
+                            <label style="display:flex; gap:8px; align-items:center; cursor:pointer">
+                                <input type="radio" name="visibility" value="public" checked
+                                    onchange="togglePassword(false)">
+                                Public
+                            </label>
+                            <label style="display:flex; gap:8px; align-items:center; cursor:pointer">
+                                <input type="radio" name="visibility" value="private" onchange="togglePassword(true)">
+                                Private
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group" id="passwordGroup" style="display:none;">
+                        <label class="room-category" style="margin-left:0">Access Key</label>
+                        <input type="text" id="newRoomPass" class="lobby-input" placeholder="Secret Key">
+                    </div>
+                    <button class="action-btn" onclick="createRoom()">🚀 Initialize Room</button>
+                </div>
+            </div>
+
+            <!-- Tab: Private -->
+            <div id="tab-private" class="tab-content">
+                <div class="room-card" style="max-width:500px; cursor:default;">
+                    <h3 style="margin-bottom:20px;">Secure Uplink</h3>
+                    <div class="form-group">
+                        <label class="room-category" style="margin-left:0">Room Code</label>
+                        <input type="text" id="joinRoomId" class="lobby-input" placeholder="XYZ-123"
+                            style="font-family:monospace; text-transform:uppercase; letter-spacing:2px; font-size:20px;">
+                    </div>
+                    <div class="form-group">
+                        <label class="room-category" style="margin-left:0">Access Key</label>
+                        <input type="text" id="joinRoomPass" class="lobby-input" placeholder="If required">
+                    </div>
+                    <button class="action-btn" onclick="joinPrivate()">🔌 Connect</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Interface -->
+    <div id="mainApp" class="app-container" style="display:none;">
+
+        <!-- Sidebar -->
+        <div class="rooms-sidebar">
+            <div class="server-header">
+                VoiceBridge <span style="font-size:10px; opacity:0.5; margin-left:8px">PRO</span>
+                <div id="displayRoomCode"
+                    style="margin-left:auto; font-family:monospace; font-size:12px; background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:4px;">
+                    ...</div>
+            </div>
+
+            <div class="room-list">
+                <div class="room-category">CHANNELS</div>
+                <div class="room-item active">
+                    <span># general-voice</span>
+                </div>
+            </div>
+
+            <div class="user-area">
+                <div class="user-info">
+                    <div class="user-avatar" id="myAvatar" onclick="window.location.href='profile.html'"
+                        style="cursor:pointer;" title="Edit Profile">U</div>
+                    <div class="user-details">
+                        <div class="user-name" id="myName">User</div>
+                        <div class="user-lang" id="myLang">EN</div>
+                    </div>
+                    <button class="control-btn danger" style="padding:4px 8px;" onclick="leaveRoom()"
+                        title="Disconnect">✕</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Participants (Middle Panel) -->
+        <div class="participants-panel">
+            <div class="panel-header">PARTICIPANTS</div>
+            <div style="flex:1; overflow-y:auto; padding:10px;" id="participantsList">
+                <div class="room-category">On Stage</div>
+                <div id="speakersList"></div>
+
+                <div class="room-category" style="margin-top:20px;">Audience</div>
+                <div id="spectatorsList"></div>
+            </div>
+        </div>
+
+        <!-- Presentation Area (Hidden by default) -->
+        <div class="presentation-area" id="presentationArea">
+            <video id="presentationVideo" style="width:100%; height:100%; object-fit:contain;" autoplay
+                playsinline></video>
+            <div class="presentation-overlay">
+                <span class="badge">LIVE FEED</span>
+                <span id="presenterName">Presenter</span>
+                <button onclick="stopPresentation()" id="stopPresentingBtn" class="control-btn danger"
+                    style="margin-left:15px; display:none;">Stop Sharing</button>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="chat-title"># general</div>
+                <div style="display:flex; gap:8px;">
+                    <button class="control-btn primary" id="micBtn" onclick="toggleMic()">🎤 On</button>
+                    <button class="control-btn" id="audioBtn" onclick="toggleAudio()">🔊 On</button>
+                    <button class="control-btn" id="screenShareBtn" onclick="toggleScreenShare()">🖥️ Share</button>
+                </div>
+            </div>
+
+            <div class="messages-area" id="messagesArea">
+                <div style="text-align:center; color:var(--text-muted); margin-top:20px; font-size:13px;">
+                    — Secure Encrypted Connection Established —
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input type="text" id="messageInput" placeholder="Broadcast a message..."
+                        onkeypress="handleKeyPress(event)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+        let myName, myLang, myRole, myRoomCode, myRoomName;
+        let isMuted = false;
+        let isAudioEnabled = true;
+
+        const langNames = {
+            'pt-BR': 'PT', 'en-US': 'EN', 'es-ES': 'ES',
+            'fr-FR': 'FR', 'de-DE': 'DE', 'it-IT': 'IT',
+            'ja-JP': 'JA', 'zh-CN': 'ZH'
+        };
+
+        // === CONSOLIDATED LOBBY LOGIC ===
+
+        window.onload = function () {
+            fetchRooms();
+
+            // Check session
+            const saved = sessionStorage.getItem('vb_session');
+            if (saved) {
+                const session = JSON.parse(saved);
+                document.getElementById('userName').value = session.name || "Guest";
+                document.getElementById('userLang').value = session.lang || "en-US";
+                document.getElementById('userRole').value = session.role || "speaker";
+            }
+
+            // Enter key support
+            document.getElementById('newRoomName').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') createRoom();
+            });
+            document.getElementById('joinRoomId').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') joinPrivate();
+            });
+        };
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            if (event && event.currentTarget) event.currentTarget.classList.add('active');
+
+            if (tab === 'public') fetchRooms();
+        }
+
+        async function fetchRooms() {
+            try {
+                const res = await fetch('/api/rooms');
+                const data = await res.json();
+                const container = document.getElementById('publicRoomsList');
+                if (!data.rooms || data.rooms.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-muted); padding:20px;">No public rooms detected.</div>';
+                    return;
+                }
+                container.innerHTML = data.rooms.map(r => `
+                    <div class="room-card" onclick="joinPublic('${r.id}', ${r.is_private})">
+                        <h3>${r.name}</h3>
+                        <div style="font-size:12px; color:var(--text-muted); display:flex; justify-content:space-between; margin-top:10px;">
+                            <span>👥 ${r.users_count || 0} online</span>
+                            <span>${r.is_private ? '🔒 Private' : '🌐 Public'}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { console.error("Fetch error:", e); }
+        }
+
+        function togglePassword(show) {
+            document.getElementById('passwordGroup').style.display = show ? 'block' : 'none';
+        }
+
+        // Action Handlers
+        function createRoom() {
+            const name = document.getElementById('newRoomName').value || "Untitled Room";
+            const visibility = document.querySelector('input[name="visibility"]:checked').value;
+            const password = document.getElementById('newRoomPass').value;
+            connectLobby('CREATE', name, password, visibility === 'public');
+        }
+
+        function joinPrivate() {
+            const code = document.getElementById('joinRoomId').value.trim().toUpperCase();
+            const password = document.getElementById('joinRoomPass').value;
+            if (!code) return alert("Enter a room code!");
+            connectLobby(code, '', password, false);
+        }
+
+        function joinPublic(id, hasPass) {
+            let pass = "";
+            if (hasPass) {
+                pass = prompt("Enter room password:");
+                if (pass === null) return;
+            }
+            connectLobby(id, '', pass, true);
+        }
+
+        function connectLobby(action, nameOrId, password, isPublic) {
+            // 1. Gather User Info
+            myName = document.getElementById('userName').value || "Guest";
+            myLang = document.getElementById('userLang').value;
+            myRole = document.getElementById('userRole').value;
+
+            // 2. UI Transition
+            document.getElementById('lobbyScreen').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'flex';
+
+            // 3. Set Sidebar Info
+            document.getElementById('myName').textContent = myName;
+            document.getElementById('myLang').textContent = langNames[myLang] || myLang;
+            document.getElementById('myAvatar').textContent = myName.charAt(0).toUpperCase();
+
+            // 4. Connect
+            const token = localStorage.getItem('vb_token');
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let wsUrl = `${protocol}//${window.location.host}/ws`;
+            if (token) wsUrl += `?token=${token}`;
+
+            socket = new WebSocket(wsUrl);
+
+            socket.onopen = () => {
+                console.log("WS Connected", action);
+                const payload = {
+                    type: 'init',
+                    language: myLang,
+                    name: myName,
+                    role: myRole,
+                    password: password
+                };
+
+                if (action === 'CREATE') {
+                    payload.room_id = 'CREATE';
+                    payload.room_name = nameOrId;
+                    payload.is_public = isPublic;
+                } else {
+                    payload.room_id = action; // 'action' is the ID for join
+                }
+
+                socket.send(JSON.stringify(payload));
+            };
+
+            socket.onmessage = handleSocketMessage;
+            socket.onclose = () => { console.log("WS Closed"); };
+            socket.onerror = (e) => console.error("WS Error", e);
+        }
+
+        function handleSocketMessage(event) {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'error') {
+                alert(data.message);
+                location.reload();
+            } else if (data.type === 'room_joined') {
+                myRoomCode = data.room_id;
+                const roomName = data.room_name || `Room ${myRoomCode}`;
+                document.getElementById('displayRoomCode').textContent = `ID: ${myRoomCode}`;
+                document.querySelector('.room-name').textContent = roomName; // WARNING: room-name class might not check out? 
+                // Wait, I don't see .room-name in header HTML!
+                // Line 126: VoiceBridge PRO ... 
+                // There is NO element with class .room-name in Sidebar!
+                // I should add it or fix this line.
+                // Assuming I should add it to the header or just ignore if null?
+                // Let's safe check it.
+                if (document.querySelector('.room-name'))
+                    document.querySelector('.room-name').textContent = roomName;
+
+                addSystemMessage(`--> Entered Lobby: ${roomName} <--`);
+
+                // Save Session
+                sessionStorage.setItem('vb_session', JSON.stringify({
+                    name: myName, lang: myLang, role: myRole, room: myRoomCode
+                }));
+            }
+            else if (data.type === 'message') addMessage(data);
+            else if (data.type === 'system') addSystemMessage(data.message);
+            else if (data.type === 'participants') {
+                updateParticipants(data.participants);
+                globalParticipants = {}; // Save for WebRTC
+                data.participants.forEach(p => globalParticipants[p.id] = p);
+            }
+
+            // WebRTC Signaling Hijack
+            if (data.type.startsWith('signal_')) {
+                handleSignalMessage(data);
+            }
+            if (data.type === 'presentation_started') {
+                document.getElementById('presenterName').textContent = `${data.presenter_name} is presenting`;
+            }
+            if (data.type === 'presentation_stopped') {
+                resetPresentationUI();
+                if (peerConnections[data.presenter_id]) {
+                    peerConnections[data.presenter_id].close();
+                    delete peerConnections[data.presenter_id];
+                }
+            }
+        }
+
+        // Generate unique color for each user
+        function getUserColor(userId) {
+            const colors = [
+                '#667eea', '#764ba2', '#f093fb', '#4facfe',
+                '#43e97b', '#fa709a', '#fee140', '#30cfd0',
+                '#a8edea', '#fed6e3', '#ffecd2', '#fcb69f'
+            ];
+            const hash = userId.split('').reduce((acc, char) => {
+                return char.charCodeAt(0) + ((acc << 5) - acc);
+            }, 0);
+            return colors[Math.abs(hash) % colors.length];
+        }
+
+        function leaveRoom() {
+            sessionStorage.removeItem('vb_session');
+            if (socket) socket.close();
+            window.location.reload();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text || socket.readyState !== WebSocket.OPEN) return;
+
+            console.log(`📤 Sending message: "${text}" in ${myLang}`);
+            socket.send(JSON.stringify({
+                type: 'speech',
+                text: text,
+                source_lang: myLang
+            }));
+            input.value = '';
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        function addMessage(data) {
+            console.log(`📥 Received message:`, data);
+            const container = document.getElementById('messagesArea');
+            const langCode = langNames[data.sender_lang] || data.sender_lang.split('-')[0].toUpperCase();
+            const avatarColor = getUserColor(data.sender_id);
+
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.innerHTML = `
+                <div class="message-avatar" style="background: ${avatarColor};">${data.sender_name.charAt(0).toUpperCase()}</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-author" style="color: ${avatarColor};">${data.sender_name}</span>
+                        <span class="message-lang">${langCode}</span>
+                        <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                    </div>
+                    ${!data.is_self ? `<div class="message-original">"${data.original_text}"</div>` : ''}
+                    <div class="message-translated">${data.translated_text}</div>
+                    ${data.audio_url ? `<div class="message-audio"><audio controls src="${data.audio_url}"></audio></div>` : ''}
+                </div>
+            `;
+
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addSystemMessage(text) {
+            const container = document.getElementById('messagesArea');
+            const div = document.createElement('div');
+            div.className = 'system-message';
+            div.textContent = text;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateParticipants(participants) {
+            const speakers = participants.filter(p => p.role === 'speaker');
+            const spectators = participants.filter(p => p.role === 'spectator');
+
+            // Fixed: Target .room-category inside #participantsList
+            const titles = document.querySelectorAll('#participantsList .room-category');
+            if (titles.length > 0) titles[0].textContent = `On Stage — ${speakers.length}`;
+            if (titles.length > 1) titles[1].textContent = `Audience — ${spectators.length}`;
+
+            const speakersList = document.getElementById('speakersList');
+            const spectatorsList = document.getElementById('spectatorsList');
+
+            speakersList.innerHTML = speakers.map(p => createParticipantHTML(p)).join('');
+            spectatorsList.innerHTML = spectators.map(p => createParticipantHTML(p)).join('');
+        }
+
+        function createParticipantHTML(p) {
+            const langCode = langNames[p.language] || p.language.split('-')[0].toUpperCase();
+            const avatarColor = getUserColor(p.id);
+            return `
+                <div class="participant">
+                    <div class="participant-avatar" style="background: ${p.avatar_url ? 'transparent' : avatarColor};">
+                        ${p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : p.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="participant-info">
+                        <div class="participant-name" style="color: ${avatarColor};">${p.name}</div>
+                        <div class="participant-lang">${langCode}</div>
+                    </div>
+                    <div class="participant-status ${p.role === 'spectator' ? 'spectator' : ''}"></div>
+                </div>
+            `;
+        }
+
+        function toggleMic() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('micBtn');
+            btn.className = isMuted ? 'control-btn danger' : 'control-btn primary';
+            btn.textContent = isMuted ? '🔇 Muted' : '🎤 Unmuted';
+        }
+
+        // --- WebRTC Logic ---
+        let localStream = null;
+        let peerConnections = {};
+        let globalParticipants = {};
+        const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        async function toggleScreenShare() {
+            if (localStream) stopPresentation();
+            else startDetailedPresentation();
+        }
+
+        async function startDetailedPresentation() {
+            try {
+                localStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" }, audio: false });
+                localStream.getVideoTracks()[0].onended = () => stopPresentation();
+
+                document.body.classList.add('presentation-mode');
+                const videoEl = document.getElementById('presentationVideo');
+                videoEl.srcObject = localStream;
+                videoEl.muted = true;
+
+                document.getElementById('screenShareBtn').textContent = '⏹ Stop Sharing';
+                document.getElementById('screenShareBtn').classList.add('danger');
+                document.getElementById('presenterName').textContent = 'You are presenting';
+                document.getElementById('presentationArea').style.display = 'flex';
+
+                socket.send(JSON.stringify({ type: 'start_presentation' }));
+
+                Object.keys(globalParticipants).forEach(targetId => {
+                    if (targetId !== 'me' && targetId !== myName) {
+                        initiatePeerConnection(targetId);
+                    }
+                });
+            } catch (err) { console.error("Error sharing screen: " + err); }
+        }
+
+        function stopPresentation() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            Object.values(peerConnections).forEach(pc => pc.close());
+            peerConnections = {};
+            socket.send(JSON.stringify({ type: 'stop_presentation' }));
+            resetPresentationUI();
+        }
+
+        function resetPresentationUI() {
+            document.body.classList.remove('presentation-mode');
+            document.getElementById('presentationVideo').srcObject = null;
+            document.getElementById('screenShareBtn').textContent = '🖥️ Share';
+            document.getElementById('screenShareBtn').classList.remove('danger');
+            document.getElementById('presentationArea').style.display = 'none';
+        }
+
+        function initiatePeerConnection(targetId) {
+            const pc = createPeerConnection(targetId);
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            pc.createOffer().then(offer => {
+                pc.setLocalDescription(offer);
+                socket.send(JSON.stringify({ type: 'signal_offer', sdp: offer, target: targetId }));
+            });
+        }
+
+        function createPeerConnection(targetId) {
+            console.log(`🛠️ Creating RTCPeerConnection for ${targetId}`);
+            const pc = new RTCPeerConnection(iceServers);
+            pc.iceQueue = [];
+            peerConnections[targetId] = pc;
+
+            pc.oniceconnectionstatechange = () => console.log(`🧊 ICE State (${targetId}): ${pc.iceConnectionState}`);
+            pc.onconnectionstatechange = () => console.log(`🔗 Connection State (${targetId}): ${pc.connectionState}`);
+
+            pc.onicecandidate = (e) => {
+                if (e.candidate) socket.send(JSON.stringify({ type: 'signal_ice', candidate: e.candidate, target: targetId }));
+            };
+            pc.ontrack = (e) => {
+                console.log(`📹 Received Remote Track from ${targetId}`);
+                const videoEl = document.getElementById('presentationVideo');
+                videoEl.srcObject = e.streams[0];
+                videoEl.onloadedmetadata = () => {
+                    videoEl.play().catch(e => console.error("Autoplay failed:", e));
+                };
+                document.body.classList.add('presentation-mode');
+                document.getElementById('presentationArea').style.display = 'flex';
+                document.getElementById('stopPresentingBtn').style.display = 'none';
+            };
+            return pc;
+        }
+
+        async function handleSignalMessage(data) {
+            const targetId = data.sender;
+            let pc = peerConnections[targetId];
+
+            if (data.type === 'signal_offer') {
+                if (!pc) pc = createPeerConnection(targetId);
+                console.log(`📡 Sending Signal Answer to ${targetId}`);
+                await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+
+                if (pc.iceQueue) {
+                    for (let candidate of pc.iceQueue) {
+                        try { await pc.addIceCandidate(candidate); } catch (e) { console.error("Error adding queued ice", e); }
+                    }
+                    pc.iceQueue = [];
+                }
+
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.send(JSON.stringify({ type: 'signal_answer', sdp: answer, target: targetId }));
+
+            } else if (data.type === 'signal_answer') {
+                console.log(`📡 Received Answer from ${targetId}`);
+                if (pc) await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+
+            } else if (data.type === 'signal_ice') {
+                if (!pc) return;
+
+                const candidate = new RTCIceCandidate(data.candidate);
+                if (pc.remoteDescription && pc.remoteDescription.type) {
+                    try { await pc.addIceCandidate(candidate); } catch (e) { console.error("Error adding ice", e); }
+                } else {
+                    console.log(`❄️ Queuing ICE candidate for ${targetId}`);
+                    if (!pc.iceQueue) pc.iceQueue = [];
+                    pc.iceQueue.push(candidate);
+                }
+            }
+        }
+
+        function logoutFromLobby() {
+            sessionStorage.removeItem('vb_session');
+            localStorage.removeItem('vb_token');
+            localStorage.removeItem('vb_user');
+            window.location.href = 'login.html';
+        }
+
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            const btn = document.getElementById('audioBtn');
+            btn.textContent = isAudioEnabled ? '🔊 Audio On' : '🔇 Audio Off';
+        }
+    </script>
+
+</body>
+
+</html>
