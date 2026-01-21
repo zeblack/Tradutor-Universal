@@ -2,25 +2,61 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
 venv/
-.env
+env/
+ENV/
+.venv
 
 # Database
 *.db
+*.sqlite
 *.sqlite3
 
-# OS
-.DS_Store
-Thumbs.db
+# Redis
+dump.rdb
 
-# Media Output (Don't version user generated content)
-audio_output/
-static/avatars/
-!static/avatars/.keep
+# Audio files
+audio_output/*.mp3
+!audio_output/.gitkeep
+
+# Avatars
+avatars/*
+!avatars/.gitkeep
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
 
 # Logs
 *.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Temporary
+*.tmp
+*.temp
+.cache/

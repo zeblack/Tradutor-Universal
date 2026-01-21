@@ -1,5 +1,11 @@
-wfastapi
+fastapi
 uvicorn[standard]
 websockets
 deep-translator
 edge-tts
+Pillow
+bcrypt
+python-jose
+python-multipart
+email-validator
+redis

@@ -17,6 +17,8 @@ from tts_service import TTSService
 from auth_service import AuthService
 from database import Database
 
+import redis.asyncio as aioredis
+
 app = FastAPI()
 
 # Mount static files
@@ -37,7 +39,15 @@ translator = TranslationService()
 tts = TTSService()
 auth = AuthService()
 db = Database()
-print("Services initialized (Translator + TTS + Auth).")
+
+# Redis for room persistence only
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+try:
+    redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
+    print(f"Services initialized (Translator + TTS + Auth + Redis at {REDIS_URL}).")
+except:
+    redis_client = None
+    print("Services initialized (Translator + TTS + Auth). Redis not available.")
 
 # Room Management
 @dataclass
@@ -48,11 +58,13 @@ class Room:
     is_public: bool = True
     password: str = None
     created_by: str = None
+    active_presenter: str = None  # Track who is presenting
 
 @dataclass
 class User:
     websocket: WebSocket
-    user_id: str
+    connection_id: str  # Unique per WebSocket connection
+    user_id: str        # Account ID (can be same across connections)
     language: str 
     name: str
     room_id: str
@@ -61,6 +73,7 @@ class User:
     session_id: int = None
 
 # Global Rooms storage
+# rooms[room_id].users is now keyed by connection_id, not user_id
 rooms: Dict[str, Room] = {}
 
 class ConnectionManager:
@@ -328,6 +341,27 @@ async def broadcast_translation(room_id: str, sender: User, original_text: str, 
 async def list_rooms():
     """List functional public rooms for the lobby"""
     public_rooms = []
+    
+    # Try Redis first for cross-process visibility
+    if redis_client:
+        try:
+            room_ids = await redis_client.smembers("rooms:public")
+            for rid in room_ids:
+                r_data = await redis_client.hgetall(f"rooms:{rid}")
+                if r_data:
+                    # Count users from in-memory if room exists locally
+                    u_count = len(rooms[rid].users) if rid in rooms else 0
+                    public_rooms.append({
+                        "id": rid,
+                        "name": r_data.get("name", "Untitled Room"),
+                        "users_count": u_count,
+                        "has_password": r_data.get("password") != ""
+                    })
+            return {"rooms": public_rooms}
+        except Exception as e:
+            print(f"Redis fetch error: {e}")
+    
+    # Fallback to in-memory
     for r in rooms.values():
         if r.is_public:
             public_rooms.append({
@@ -396,6 +430,22 @@ async def websocket_endpoint(
                 created_by=user_id
             )
             rooms[room_id] = new_room
+            
+            # Sync with Redis
+            if redis_client:
+                try:
+                    await redis_client.hset(f"rooms:{room_id}", mapping={
+                        "id": room_id,
+                        "name": req_room_name,
+                        "is_public": str(req_is_public),
+                        "password": req_password if req_password else "",
+                        "created_by": user_id
+                    })
+                    if req_is_public:
+                        await redis_client.sadd("rooms:public", room_id)
+                except Exception as e:
+                    print(f"Redis sync error: {e}")
+            
             print(f"🏠 Created new room: {room_id} ({req_room_name})")
             
         else:
@@ -408,10 +458,25 @@ async def websocket_endpoint(
                     id=room_id,
                     name=f"Room {room_id}",
                     users={},
-                    is_public=False,
-                    password=None
+                    is_public=req_is_public,  # Use the requested public flag
+                    password=req_password if req_password else None
                 )
                 rooms[room_id] = new_room
+                
+                # Sync with Redis
+                if redis_client:
+                    try:
+                        await redis_client.hset(f"rooms:{room_id}", mapping={
+                            "id": room_id,
+                            "name": f"Room {room_id}",
+                            "is_public": str(req_is_public),
+                            "password": req_password if req_password else "",
+                            "created_by": ""
+                        })
+                        if req_is_public:
+                            await redis_client.sadd("rooms:public", room_id)
+                    except Exception as e:
+                        print(f"Redis sync error: {e}")
             
             # Password check
             room = rooms[room_id]
@@ -420,9 +485,11 @@ async def websocket_endpoint(
                 await websocket.close()
                 return
         
-        # Create user object
+        # Create user object with unique connection_id
+        connection_id = str(uuid.uuid4())
         user = User(
             websocket=websocket,
+            connection_id=connection_id,
             user_id=user_id,
             language=user_lang,
             name=user_name,
@@ -431,9 +498,9 @@ async def websocket_endpoint(
             avatar_url=user_avatar
         )
         
-        rooms[room_id].users[user_id] = user
+        rooms[room_id].users[connection_id] = user  # Key by connection_id, not user_id
         room_obj = rooms[room_id]
-        print(f"✅ {user_name} joined Room {room_id} (ID: {user_id})")
+        print(f"✅ {user_name} joined Room {room_id} (ID: {user_id}, Conn: {connection_id[:8]})")
 
         # 2. Track Session
         if authenticated_user:
@@ -458,6 +525,32 @@ async def websocket_endpoint(
             "user_id": user_id
         })
         
+        # Notify about active presentation if any (late-join support)
+        if room_obj.active_presenter and room_obj.active_presenter != user_id:
+            # Find presenter connection
+            presenter_user = None
+            for conn_id, u in rooms[room_id].users.items():
+                if u.user_id == room_obj.active_presenter:
+                    presenter_user = u
+                    break
+            
+            if presenter_user:
+                # Notify viewer about presentation
+                await websocket.send_json({
+                    "type": "presentation_started",
+                    "presenter_id": room_obj.active_presenter,
+                    "presenter_name": presenter_user.name
+                })
+                print(f"📺 Notified {user_name} about ongoing presentation by {presenter_user.name}")
+                
+                # Notify presenter about new viewer (so they can send offer)
+                await presenter_user.websocket.send_json({
+                    "type": "new_viewer",
+                    "viewer_id": user_id,
+                    "viewer_name": user_name
+                })
+                print(f"👁️ Notified presenter {presenter_user.name} about new viewer {user_name}")
+        
         # Notify room
         await broadcast_system_message(room_id, f"{user_name} joined the room", exclude_user=None)
         await broadcast_participant_list(room_id)
@@ -477,13 +570,24 @@ async def websocket_endpoint(
                 await broadcast_translation(room_id, user, original_text, user.language)
             
             elif message_type in ["signal_offer", "signal_answer", "signal_ice"]:
-                target_id = data.get("target")
-                if target_id and target_id in rooms.get(room_id, Room("","",{})).users:
-                    target_user = rooms[room_id].users[target_id]
-                    data["sender"] = user_id
-                    await target_user.websocket.send_json(data)
+                # WebRTC signaling - find target by user_id
+                target_user_id = data.get("target")
+                if target_user_id and room_id in rooms:
+                    # Find the target user's connection(s)
+                    for conn_id, room_user in rooms[room_id].users.items():
+                        if room_user.user_id == target_user_id:
+                            data["sender"] = user_id
+                            try:
+                                await room_user.websocket.send_json(data)
+                                print(f"📡 WebRTC signal sent: {message_type} from {user_id} to {target_user_id}")
+                            except Exception as e:
+                                print(f"Error sending WebRTC signal: {e}")
+                            break  # Send to first matching connection
             
             elif message_type == "start_presentation":
+                # Track active presenter
+                rooms[room_id].active_presenter = user_id
+                
                 await broadcast_system_message(room_id, f"📺 {user_name} started presenting", exclude_user=None)
                 for u in rooms[room_id].users.values():
                      if u.user_id != user_id:
@@ -494,6 +598,9 @@ async def websocket_endpoint(
                         })
 
             elif message_type == "stop_presentation":
+                # Clear active presenter
+                rooms[room_id].active_presenter = None
+                
                 for u in rooms[room_id].users.values():
                     await u.websocket.send_json({
                         "type": "presentation_stopped",
@@ -512,13 +619,31 @@ async def websocket_endpoint(
              except Exception as e:
                  print(f"Error ending session: {e}")
 
-        if room_id and room_id in rooms and user_id in rooms[room_id].users:
-            if user_id in rooms[room_id].users:
-                del rooms[room_id].users[user_id]
+        if room_id and room_id in rooms:
+            # Find and remove this specific connection
+            connection_to_remove = None
+            for conn_id, room_user in rooms[room_id].users.items():
+                if room_user.websocket == websocket:
+                    connection_to_remove = conn_id
+                    break
+            
+            if connection_to_remove:
+                del rooms[room_id].users[connection_to_remove]
+                print(f"🗑️ Removed {user_name if 'user_name' in locals() else user_id} from Room {room_id} (Conn: {connection_to_remove[:8]})")
             
             if not rooms[room_id].users:
+                # Delete from both in-memory and Redis
                 del rooms[room_id]
+                if redis_client:
+                    try:
+                        await redis_client.delete(f"rooms:{room_id}")
+                        await redis_client.srem("rooms:public", room_id)
+                    except Exception as e:
+                        print(f"Redis cleanup error: {e}")
                 print(f"🗑️ Room {room_id} deleted (empty)")
             else:
-                await broadcast_system_message(room_id, f"{user.name} left the room", exclude_user=user_id)
+                # Broadcast updates to remaining users
+                if user and user.name:
+                    await broadcast_system_message(room_id, f"{user.name} left the room", exclude_user=user_id)
                 await broadcast_participant_list(room_id)
+                print(f"📢 Broadcasted participant list update for room {room_id}")

@@ -124,7 +124,10 @@
         <!-- Sidebar -->
         <div class="rooms-sidebar">
             <div class="server-header">
-                VoiceBridge <span style="font-size:10px; opacity:0.5; margin-left:8px">PRO</span>
+                <div>
+                    <div class="room-name" style="font-size:14px; line-height:1.2;">VoiceBridge</div>
+                    <span style="font-size:10px; opacity:0.5;">PRO</span>
+                </div>
                 <div id="displayRoomCode"
                     style="margin-left:auto; font-family:monospace; font-size:12px; background:rgba(255,255,255,0.1); padding:4px 8px; border-radius:4px;">
                     ...</div>
@@ -145,6 +148,8 @@
                         <div class="user-name" id="myName">User</div>
                         <div class="user-lang" id="myLang">EN</div>
                     </div>
+                    <button class="control-btn" style="padding:4px 8px; background:var(--primary);"
+                        onclick="toggleScreenShare()" title="Share Screen">📺</button>
                     <button class="control-btn danger" style="padding:4px 8px;" onclick="leaveRoom()"
                         title="Disconnect">✕</button>
                 </div>
@@ -180,8 +185,6 @@
             <div class="chat-header">
                 <div class="chat-title"># general</div>
                 <div style="display:flex; gap:8px;">
-                    <button class="control-btn primary" id="micBtn" onclick="toggleMic()">🎤 On</button>
-                    <button class="control-btn" id="audioBtn" onclick="toggleAudio()">🔊 On</button>
                     <button class="control-btn" id="screenShareBtn" onclick="toggleScreenShare()">🖥️ Share</button>
                 </div>
             </div>
@@ -194,13 +197,29 @@
 
             <div class="input-area">
                 <div class="input-wrapper">
+                    <button id="sttBtn" onclick="toggleStt()"
+                        style="background:transparent; border:none; cursor:pointer; padding:0 10px; color:var(--text-muted); transition:all 0.2s; display:flex; align-items:center;"
+                        title="Dictate">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                            <line x1="12" y1="19" x2="12" y2="23"></line>
+                            <line x1="8" y1="23" x2="16" y2="23"></line>
+                        </svg>
+                    </button>
                     <input type="text" id="messageInput" placeholder="Broadcast a message..."
                         onkeypress="handleKeyPress(event)">
+                    <button id="sendBtn" onclick="sendMessage()"
+                        style="background:transparent; border:none; cursor:pointer; font-size:20px; padding:0 10px; color:var(--primary); transition:transform 0.2s;"
+                        title="Send">➤</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- TEMPORARILY DISABLED: Causing page freeze -->
+    <!-- <script src="webrtc_screen_share.js"></script> -->
     <script>
         let socket;
         let myName, myLang, myRole, myRoomCode, myRoomName;
@@ -225,6 +244,12 @@
                 document.getElementById('userName').value = session.name || "Guest";
                 document.getElementById('userLang').value = session.lang || "en-US";
                 document.getElementById('userRole').value = session.role || "speaker";
+
+                // Auto-reconnect if we were in a room
+                if (session.room) {
+                    console.log("🔄 Persistência de sessão: Reconectando à sala " + session.room);
+                    connectLobby(session.room, '', '', true);
+                }
             }
 
             // Enter key support
@@ -351,17 +376,12 @@
                 location.reload();
             } else if (data.type === 'room_joined') {
                 myRoomCode = data.room_id;
+                myUserId = data.user_id; // Store for WebRTC
                 const roomName = data.room_name || `Room ${myRoomCode}`;
                 document.getElementById('displayRoomCode').textContent = `ID: ${myRoomCode}`;
-                document.querySelector('.room-name').textContent = roomName; // WARNING: room-name class might not check out? 
-                // Wait, I don't see .room-name in header HTML!
-                // Line 126: VoiceBridge PRO ... 
-                // There is NO element with class .room-name in Sidebar!
-                // I should add it or fix this line.
-                // Assuming I should add it to the header or just ignore if null?
-                // Let's safe check it.
-                if (document.querySelector('.room-name'))
+                if (document.querySelector('.room-name')) {
                     document.querySelector('.room-name').textContent = roomName;
+                }
 
                 addSystemMessage(`--> Entered Lobby: ${roomName} <--`);
 
@@ -383,7 +403,23 @@
                 handleSignalMessage(data);
             }
             if (data.type === 'presentation_started') {
+                console.log('📺 Presentation started by', data.presenter_name);
                 document.getElementById('presenterName').textContent = `${data.presenter_name} is presenting`;
+
+                // Create peer connection to receive stream (for late joiners)
+                if (data.presenter_id && !peerConnections[data.presenter_id]) {
+                    console.log('🔗 Late-join: Creating peer connection to presenter', data.presenter_id);
+                    createPeerConnection(data.presenter_id);
+                    console.log('✅ Peer connection ready for late-join');
+                }
+            }
+            if (data.type === 'new_viewer') {
+                // Presenter: new viewer joined, send them an offer
+                console.log('👁️ New viewer joined:', data.viewer_name);
+                if (localStream && data.viewer_id) {
+                    initiatePeerConnection(data.viewer_id);
+                    console.log('✅ Created peer connection for new viewer', data.viewer_name);
+                }
             }
             if (data.type === 'presentation_stopped') {
                 resetPresentationUI();
@@ -645,6 +681,85 @@
             isAudioEnabled = !isAudioEnabled;
             const btn = document.getElementById('audioBtn');
             btn.textContent = isAudioEnabled ? '🔊 Audio On' : '🔇 Audio Off';
+        }
+
+        // --- Speech-to-Text Logic ---
+        let recognition;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = function () {
+                const btn = document.getElementById('sttBtn');
+                btn.classList.add('recording');
+                btn.style.color = 'var(--danger)';
+                btn.style.animation = 'pulse 1s infinite';
+            };
+
+            recognition.onend = function () {
+                const btn = document.getElementById('sttBtn');
+                btn.classList.remove('recording');
+                btn.style.color = 'var(--text-muted)';
+                btn.style.animation = 'none';
+            };
+
+            recognition.onresult = function (event) {
+                const transcript = event.results[0][0].transcript;
+                const input = document.getElementById('messageInput');
+                // Auto-capitalize first letter if empty
+                let text = transcript;
+                if (!input.value) {
+                    text = text.charAt(0).toUpperCase() + text.slice(1);
+                }
+                input.value += (input.value ? ' ' : '') + text;
+                input.focus();
+            };
+
+            recognition.onerror = function (event) {
+                console.error("STT Error:", event.error);
+                const btn = document.getElementById('sttBtn');
+
+                // Reset UI state
+                btn.classList.remove('recording');
+                btn.style.color = 'var(--text-muted)';
+                btn.style.animation = 'none';
+
+                if (event.error === 'network') {
+                    console.warn("🌐 Network error detected. Attempting to restart STT...");
+                    // Try to restart after a short delay
+                    setTimeout(() => {
+                        if (!btn.classList.contains('recording')) {
+                            toggleStt();
+                        }
+                    }, 2000);
+                } else if (event.error === 'not-allowed') {
+                    alert("⚠️ Permissão de microfone negada. Verifique as configurações do navegador.");
+                } else {
+                    console.error("❌ STT failed with error:", event.error);
+                }
+            };
+        } else {
+            const btn = document.getElementById('sttBtn');
+            if (btn) btn.style.display = 'none';
+        }
+
+        function toggleStt() {
+            if (!recognition) return alert("Browser does not support Speech Recognition");
+
+            const btn = document.getElementById('sttBtn');
+            if (btn.classList.contains('recording')) {
+                recognition.stop();
+            } else {
+                recognition.lang = myLang || 'pt-BR';
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error(e);
+                }
+            }
         }
     </script>
 

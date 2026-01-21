@@ -10,7 +10,10 @@ class TTSService:
             'pt': 'pt-BR-AntonioNeural',
             'es': 'es-ES-AlvaroNeural',
             'fr': 'fr-FR-HenriNeural',
-            'de': 'de-DE-ConradNeural'
+            'de': 'de-DE-ConradNeural',
+            'it': 'it-IT-IsabellaNeural',
+            'ja': 'ja-JP-NanamiNeural',
+            'zh-CN': 'zh-CN-XiaoxiaoNeural'
         }
 
     async def generate_audio(self, text, lang='en'):
